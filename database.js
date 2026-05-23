@@ -1,12 +1,17 @@
-// database.js - Dual Database Adapter (Hostinger MySQL + Local SQLite)
-const fs = require('fs');
+// database.js - Hostinger MySQL adapter with local SQLite fallback
 const path = require('path');
 
 let dbDriver = 'sqlite'; // Default fallback
 let dbConnection = null;
 
-// Determine if we should connect to Hostinger MySQL
-const isMySQLConfigured = process.env.DB_HOST && process.env.DB_USER && process.env.DB_NAME;
+const REQUIRED_MYSQL_ENV = ['DB_HOST', 'DB_PORT', 'DB_NAME', 'DB_USER', 'DB_PASSWORD'];
+const providedMySQLEnv = REQUIRED_MYSQL_ENV.filter((key) => process.env[key]);
+const missingMySQLEnv = REQUIRED_MYSQL_ENV.filter((key) => !process.env[key]);
+const isMySQLConfigured = missingMySQLEnv.length === 0;
+
+if (providedMySQLEnv.length > 0 && !isMySQLConfigured) {
+  throw new Error(`Incomplete MySQL configuration. Missing: ${missingMySQLEnv.join(', ')}`);
+}
 
 if (isMySQLConfigured) {
   console.log("abilix-db: Detected MySQL Environment. Connecting to Hostinger MySQL database...");
@@ -18,14 +23,20 @@ if (isMySQLConfigured) {
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME,
-    port: process.env.DB_PORT || 3306,
+    port: Number(process.env.DB_PORT),
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0
   });
 } else {
   console.log("abilix-db: MySQL Env not found. Connecting to Local SQLite database...");
-  const sqlite3 = require('sqlite3').verbose();
+  let sqlite3;
+  try {
+    sqlite3 = require('sqlite3').verbose();
+  } catch (error) {
+    throw new Error('SQLite fallback requires the optional sqlite3 package. On Hostinger, set DB_HOST, DB_PORT, DB_NAME, DB_USER, and DB_PASSWORD instead.');
+  }
+
   const dbFile = path.join(__dirname, 'database.db');
   
   dbDriver = 'sqlite';

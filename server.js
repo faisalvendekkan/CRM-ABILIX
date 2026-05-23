@@ -4,20 +4,19 @@ const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const path = require('path');
-const fs = require('fs');
 
 // Load environment variables if present
-try {
-  require('dotenv').config();
-} catch (e) {
-  // dotenv is optional in production if using system env variables
-}
+require('dotenv').config();
 
 const db = require('./database');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const JWT_SECRET = process.env.JWT_SECRET || 'abilix_super_secret_crm_key_2026';
+const JWT_SECRET = process.env.JWT_SECRET;
+
+if (!JWT_SECRET) {
+  throw new Error('Missing required environment variable: JWT_SECRET');
+}
 
 // Middlewares
 app.use(cors());
@@ -385,13 +384,18 @@ app.get('*', (req, res) => {
 async function main() {
   await db.initializeTables();
   await seedDefaultUsers();
-  app.listen(PORT, () => {
+  app.listen(PORT, "0.0.0.0", () => {
     console.log(`===================================================`);
     console.log(`      ABILIX CRM SECURE FULL-STACK BACKEND STARTED  `);
-    console.log(`      Running on http://localhost:${PORT}          `);
+    console.log(`      Running on 0.0.0.0:${PORT}                  `);
+    console.log(`      Public domain: https://crm1.abilix.in       `);
     console.log(`      Hostinger Compliance Mode: ENABLED           `);
     console.log(`===================================================`);
   });
 }
 
-main();
+main().catch((error) => {
+  console.error('abilix-server: Startup failed.');
+  console.error(error);
+  process.exit(1);
+});

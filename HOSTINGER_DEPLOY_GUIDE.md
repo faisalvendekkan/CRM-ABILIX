@@ -1,86 +1,71 @@
-# 🚀 Hostinger Node.js Deployment Guide - Abilix CRM
+# Hostinger Node.js Deployment Guide - Abilix CRM
 
-This guide walks you through deploying **Abilix CRM** on **Hostinger Business Hosting**, **Cloud Hosting**, or **VPS Hosting** using the Hostinger Managed Node.js panel.
+Domain: `crm1.abilix.in`
+Runtime: Node.js `18.x`
+Entry point: `server.js`
+Start command: `npm start`
 
----
+## 1. Create The MySQL Database
 
-## 📋 Prerequisites
-1. A Hostinger account with a **Business** or **Cloud** plan (which natively supports Node.js and MySQL databases).
-2. A registered custom domain connected to your Hostinger plan.
+1. Open Hostinger hPanel.
+2. Go to Databases > MySQL Databases.
+3. Create a database and user.
+4. Copy these values:
+   - Database host, usually `localhost`
+   - Database port, usually `3306`
+   - Database name
+   - Database username
+   - Database password
 
----
+Abilix CRM uses Hostinger MySQL in production. The local `database.db` SQLite file is ignored and must not be deployed.
 
-## 🛠️ Step 1: Create a MySQL Database on Hostinger
-Since SQLite files can sometimes be locked or wiped during managed container restarts, **Abilix CRM** is designed to connect dynamically to Hostinger's free native MySQL database in production:
+## 2. Configure The Node.js App
 
-1. Log in to your **Hostinger hPanel**.
-2. Navigate to **Databases** -> **MySQL Databases**.
-3. Create a new MySQL database:
-   - **Database Name**: e.g., `u123456789_abilix`
-   - **MySQL User**: e.g., `u123456789_faisal`
-   - **Password**: *Create a strong password and save it.*
-4. Click **Create**. Copy the **Database Name**, **Username**, **Host** (usually `localhost`), and **Password** details.
+In Hostinger's Node.js panel:
 
----
+| Setting | Value |
+| --- | --- |
+| Domain | `crm1.abilix.in` |
+| Node.js version | `18.x` |
+| Application root | Your deployed repository folder |
+| Application entry point | `server.js` |
+| Startup file | `server.js` |
+| Start command | `npm start` |
 
-## 🌐 Step 2: Setup Node.js Application on Hostinger Panel
-1. In hPanel, search for **Node.js** under the **Advanced** section or search bar.
-2. Click **Create Application**.
-3. Configure the Application fields:
-   - **Domain**: Choose your domain (e.g., `yourdomain.com`).
-   - **App Directory**: Set to your app folder (e.g., `/public_html` or `/abilix-crm`).
-   - **App Version**: Select **Node.js 18.x** or **20.x**.
-   - **Application Entry Point**: Set this to **`server.js`** (our Express server entrypoint).
-   - **Passenger Friendly Error Pages**: Set to **Disabled** (for security).
-4. Click **Create**.
+The server binds to `process.env.PORT || 3000` on `0.0.0.0`, which is required for Hostinger managed Node.js hosting.
 
----
+## 3. Required Environment Variables
 
-## ⚙️ Step 3: Configure Hostinger Environment Variables
-To securely connect **Abilix CRM** to your newly created MySQL database and JWT sessions, you must configure **Environment Variables** in Hostinger's Node.js dashboard:
+Add these in the Hostinger Node.js dashboard:
 
-1. Scroll down to the **Environment Variables** section in your Hostinger Node.js App Dashboard.
-2. Add the following variables (one by one):
+| Variable | Required value |
+| --- | --- |
+| `PORT` | Hostinger-provided port, or `3000` if Hostinger asks for one |
+| `JWT_SECRET` | A long random secret string |
+| `DB_HOST` | Hostinger MySQL host, usually `localhost` |
+| `DB_PORT` | `3306` |
+| `DB_NAME` | Your Hostinger MySQL database name |
+| `DB_USER` | Your Hostinger MySQL username |
+| `DB_PASSWORD` | Your Hostinger MySQL password |
 
-| Variable Key | Suggested Value / Description |
-| :--- | :--- |
-| **`PORT`** | Set to the port Hostinger specifies (or leave empty, Hostinger binds dynamically). |
-| **`JWT_SECRET`** | Type a secure random string (e.g., `abilix_custom_security_key_2026`). |
-| **`DB_HOST`** | Set to `localhost` (Hostinger's default internal DB host). |
-| **`DB_USER`** | Paste your MySQL **Username** (e.g., `u123456789_faisal`). |
-| **`DB_PASSWORD`** | Paste your MySQL **Database Password**. |
-| **`DB_NAME`** | Paste your MySQL **Database Name** (e.g., `u123456789_abilix`). |
-| **`DB_PORT`** | Set to `3306` (standard MySQL port). |
+The app intentionally fails at startup if `JWT_SECRET` is missing or if only part of the MySQL configuration is provided.
 
-3. Click **Save** to apply the configuration.
+## 4. GitHub Deployment
 
----
+Commit and push the repository without generated or secret files:
 
-## 📦 Step 4: Upload and Deploy the Code
-Hostinger supports two simple, root-free deployment methods:
+- Do not commit `.env`
+- Do not commit `node_modules/`
+- Do not commit `database.db`
+- Do commit `package.json`, `package-lock.json`, `server.js`, `database.js`, `public/`, and `.env.example`
 
-### Method A: Git Deployment (Recommended)
-1. Commit the `abilix-crm` directory files to a private repository on **GitHub** (do NOT commit `.env` or `database.db` files).
-2. Go to Hostinger **Git** dashboard under **Advanced**.
-3. Paste the repository URL, connect your account, and set the branch to `main`.
-4. Click **Deploy**. Hostinger will clone the code and automatically trigger `npm install` in the background.
+Hostinger will run `npm install` from `package-lock.json`. Production dependencies are pure JavaScript plus `mysql2`; `sqlite3` has been removed from production dependencies to avoid native build failures.
 
-### Method B: ZIP File Upload
-1. Compress the contents of the `abilix-crm` folder into a ZIP file (exclude `node_modules`, `.env`, and `database.db` to keep the file small).
-2. Go to Hostinger **File Manager**.
-3. Upload the ZIP file directly into your application directory.
-4. Extract the ZIP file in place.
-5. In your **Hostinger Node.js dashboard**, scroll to the bottom and click **Run npm install**. This will download the compile-safe, pure JS packages in seconds.
+## 5. Start And Verify
 
----
-
-## 🎉 Step 5: Start the App!
-1. Once installation is complete, click **Start / Restart Application** in your Hostinger Node.js App Dashboard.
-2. Open your domain (e.g., `https://yourdomain.com`) in your browser.
-3. Solve the visual distorter **CAPTCHA**, sign in with your Faisal credentials, and enjoy your fully secure full-stack **Abilix CRM**!
-
----
-
-## 🛡️ Security & Backup Recommendation
-* **Daily Backups**: Ensure **Daily Backups** is enabled on your Hostinger hPanel dashboard under **Files** -> **Backups**.
-* **SSL Certificate**: Hostinger provides unlimited free SSL. Under **Security** -> **SSL**, make sure your domain's SSL status is **Active** so that all password hashes and JWT tokens are transmitted over encrypted HTTPS connections.
+1. Deploy from GitHub in Hostinger.
+2. Click Run npm install if Hostinger does not do it automatically.
+3. Restart the Node.js app.
+4. Open `https://crm1.abilix.in`.
+5. Confirm the login screen loads.
+6. Check Hostinger logs if startup fails; missing env vars will be named explicitly.
