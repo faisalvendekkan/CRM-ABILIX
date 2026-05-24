@@ -5,17 +5,22 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const path = require('path');
 
-// Load environment variables if present
-require('dotenv').config();
+// Load local .env values without overriding Hostinger-provided environment variables.
+require('dotenv').config({ override: false, quiet: true });
 
 const db = require('./database');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET;
+const HOST = '0.0.0.0';
 
-if (!JWT_SECRET) {
-  throw new Error('Missing required environment variable: JWT_SECRET');
+function getRequiredPort() {
+  const port = Number.parseInt(process.env.PORT, 10);
+  if (!Number.isInteger(port) || port <= 0 || port > 65535) {
+    throw new Error('Missing or invalid required environment variable: PORT');
+  }
+
+  return port;
 }
 
 // Middlewares
@@ -55,8 +60,73 @@ async function seedDefaultUsers() {
   }
 }
 
+let databaseBootstrapPromise = null;
+
+async function bootstrapDatabase() {
+  if (db.isReady()) {
+    return true;
+  }
+
+  if (!databaseBootstrapPromise) {
+    databaseBootstrapPromise = (async () => {
+      const initialized = await db.initializeTables();
+      if (initialized) {
+        await seedDefaultUsers();
+      }
+      return initialized;
+    })().finally(() => {
+      databaseBootstrapPromise = null;
+    });
+  }
+
+  return databaseBootstrapPromise;
+}
+
+app.get('/api/health', (req, res) => {
+  const database = db.getStatus();
+  const ready = Boolean(JWT_SECRET) && database.ready;
+
+  res.status(ready ? 200 : 503).json({
+    status: ready ? 'ok' : 'degraded',
+    authConfigured: Boolean(JWT_SECRET),
+    database: {
+      driver: database.driver,
+      ready: database.ready,
+      lastError: database.lastError
+    }
+  });
+});
+
+app.use('/api', (req, res, next) => {
+  if (!JWT_SECRET) {
+    return res.status(503).json({ error: 'Server authentication is not configured. Set JWT_SECRET.' });
+  }
+
+  next();
+});
+
+app.use('/api', async (req, res, next) => {
+  try {
+    const databaseReady = await bootstrapDatabase();
+    if (!databaseReady) {
+      return res.status(503).json({
+        error: 'Database unavailable. Verify DB_HOST, DB_PORT, DB_NAME, DB_USER, and DB_PASSWORD environment variables.'
+      });
+    }
+
+    next();
+  } catch (error) {
+    console.error('abilix-server: Database bootstrap check failed.', error);
+    res.status(503).json({ error: 'Database unavailable.' });
+  }
+});
+
 // --- JWT Auth Middleware ---
 function authenticateToken(req, res, next) {
+  if (!JWT_SECRET) {
+    return res.status(503).json({ error: 'Server authentication is not configured. Set JWT_SECRET.' });
+  }
+
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
   
@@ -382,20 +452,37 @@ app.get('*', (req, res) => {
 
 // Bootstrap Web Server
 async function main() {
-  await db.initializeTables();
-  await seedDefaultUsers();
-  app.listen(PORT, "0.0.0.0", () => {
+  const port = getRequiredPort();
+
+  if (!JWT_SECRET) {
+    console.error('abilix-server: Missing required environment variable: JWT_SECRET. API requests will return 503.');
+  }
+
+  const databaseReady = await bootstrapDatabase();
+  if (!databaseReady) {
+    console.error(
+      'abilix-server: Database unavailable at startup. Web server will still listen; API requests will return 503 until MySQL connects.'
+    );
+  }
+
+  const server = app.listen(port, HOST, () => {
     console.log(`===================================================`);
     console.log(`      ABILIX CRM SECURE FULL-STACK BACKEND STARTED  `);
-    console.log(`      Running on 0.0.0.0:${PORT}                  `);
+    console.log(`      Running on ${HOST}:${port}                  `);
     console.log(`      Public domain: https://crm1.abilix.in       `);
     console.log(`      Hostinger Compliance Mode: ENABLED           `);
     console.log(`===================================================`);
   });
+
+  server.on('error', (error) => {
+    console.error('abilix-server: Failed to bind web server.');
+    console.error(error);
+    process.exit(1);
+  });
 }
 
 main().catch((error) => {
-  console.error('abilix-server: Startup failed.');
+  console.error('abilix-server: Startup failed before the web server could listen.');
   console.error(error);
   process.exit(1);
 });
