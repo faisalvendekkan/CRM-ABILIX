@@ -5,13 +5,55 @@ window.CURRENCY_SYMBOL = "₹";
 const store = new CRMStore();
 let currentView = "dashboard";
 
+const PIPELINE_COLOR_OPTIONS = [
+  { name: "Red", value: "#ef4444" },
+  { name: "Orange", value: "#f97316" },
+  { name: "Amber", value: "#f59e0b" },
+  { name: "Yellow", value: "#eab308" },
+  { name: "Green", value: "#22c55e" },
+  { name: "Teal", value: "#14b8a6" },
+  { name: "Cyan", value: "#06b6d4" },
+  { name: "Blue", value: "#3b82f6" },
+  { name: "Purple", value: "#8b5cf6" },
+  { name: "Pink", value: "#ec4899" }
+];
+
+const LEGACY_STAGE_COLOR_MAP = {
+  "var(--accent-indigo)": "#3b82f6",
+  "var(--accent-emerald)": "#22c55e",
+  "var(--accent-amber)": "#f59e0b",
+  "var(--accent-crimson)": "#ef4444",
+  "#818cf8": "#8b5cf6",
+  "#a5b4fc": "#8b5cf6",
+  "#6366f1": "#3b82f6",
+  "#60a5fa": "#3b82f6",
+  "#2dd4bf": "#14b8a6",
+  "#c084fc": "#8b5cf6",
+  "#f472b6": "#ec4899"
+};
+
+function normalizeStageColor(color) {
+  if (!color) return "#3b82f6";
+  const normalized = LEGACY_STAGE_COLOR_MAP[color] || color;
+  return PIPELINE_COLOR_OPTIONS.some(option => option.value === normalized) ? normalized : "#3b82f6";
+}
+
+function renderStageColorOptions(activeColor) {
+  const normalized = normalizeStageColor(activeColor);
+  return PIPELINE_COLOR_OPTIONS
+    .map(option => `<option value="${option.value}" ${option.value === normalized ? "selected" : ""}>${option.name}</option>`)
+    .join("");
+}
+
+window.PIPELINE_COLOR_OPTIONS = PIPELINE_COLOR_OPTIONS;
+window.normalizeStageColor = normalizeStageColor;
+
 // DOM Elements cache
 const mainViewport = document.getElementById("main-viewport");
 const viewTitle = document.getElementById("view-title");
 const sidebarNavItems = document.querySelectorAll(".sidebar-nav .nav-item");
 const sidebar = document.querySelector(".sidebar");
 const sidebarToggle = document.getElementById("sidebar-toggle");
-const themeToggle = document.getElementById("theme-toggle");
 const drawerOverlay = document.getElementById("drawer-overlay");
 const contactDrawer = document.getElementById("contact-drawer");
 const btnCloseDrawer = document.getElementById("btn-close-drawer");
@@ -76,6 +118,10 @@ async function navigateToView(viewId) {
       containerLoadingState();
       const usersList = await store.getUsers();
       renderUsers(mainViewport, store, usersList);
+      break;
+    case "settings":
+      viewTitle.textContent = "Settings";
+      renderSettings(mainViewport, store);
       break;
     default:
       viewTitle.textContent = "Abilix CRM Dashboard";
@@ -225,10 +271,10 @@ function setupModalEvents() {
   });
 
   // Modal Closing binds on click triggers
-  document.querySelectorAll(".modal-overlay, .btn-close-modal, .btn-outline").forEach(el => {
+  document.querySelectorAll(".modal-overlay, .btn-close-modal").forEach(el => {
     el.addEventListener('click', (e) => {
       // Ensure we only close on direct backdrop click or actual close button clicks
-      if (e.target.classList.contains("modal-overlay") || e.target.closest(".btn-close-modal") || e.target.closest(".btn-outline")) {
+      if (e.target.classList.contains("modal-overlay") || e.target.closest(".btn-close-modal")) {
         const modal = e.target.closest(".modal-overlay");
         if (modal) modal.classList.remove("active");
       }
@@ -236,15 +282,25 @@ function setupModalEvents() {
   });
 
   // Populates selector dropdowns with latest contacts list
-  function populateContactSelects() {
+  function populateContactSelects(selectedContactId = "") {
     const list = store.getContacts();
     const dealContactSelect = document.getElementById("d-contact");
     const taskContactSelect = document.getElementById("t-contact");
 
-    const optionsHTML = list.map(c => `<option value="${c.id}">${c.name} (${c.company})</option>`).join('');
+    const placeholder = list.length > 0
+      ? '<option value="" disabled selected>Select a contact</option>'
+      : '<option value="" disabled selected>No contacts available</option>';
+    const optionsHTML = placeholder + list
+      .map(c => `<option value="${c.id}">${c.name}${c.company ? ` (${c.company})` : ""}</option>`)
+      .join('');
     
-    if (dealContactSelect) dealContactSelect.innerHTML = optionsHTML;
-    if (taskContactSelect) taskContactSelect.innerHTML = optionsHTML;
+    [dealContactSelect, taskContactSelect].forEach(select => {
+      if (!select) return;
+      select.innerHTML = optionsHTML;
+      if (selectedContactId && list.some(c => c.id === selectedContactId)) {
+        select.value = selectedContactId;
+      }
+    });
   }
 
   // Populates pipeline stages dynamically
@@ -252,7 +308,9 @@ function setupModalEvents() {
     const stages = store.getPipelineStages();
     const dealStageSelect = document.getElementById("d-stage");
     if (dealStageSelect) {
-      dealStageSelect.innerHTML = stages.map(s => `<option value="${s.key}">${s.label}</option>`).join('');
+      dealStageSelect.innerHTML = stages.length > 0
+        ? stages.map(s => `<option value="${s.key}">${s.label}</option>`).join('')
+        : '<option value="" disabled selected>No pipeline stages available</option>';
     }
   }
 
@@ -262,9 +320,9 @@ function setupModalEvents() {
     contactModal.classList.add("active");
   }
 
-  function openDealFormModal() {
+  function openDealFormModal(contactId = "") {
     document.getElementById("deal-form").reset();
-    populateContactSelects();
+    populateContactSelects(contactId);
     populateStageSelects();
     // Default targeted close date to 30 days out
     const targetDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
@@ -272,14 +330,22 @@ function setupModalEvents() {
     dealModal.classList.add("active");
   }
 
-  function openTaskFormModal() {
+  function openTaskFormModal(contactId = "") {
     document.getElementById("task-form").reset();
-    populateContactSelects();
+    populateContactSelects(contactId);
     // Default targeted due date to tomorrow
     const targetDate = new Date(Date.now() + 1 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
     document.getElementById("t-duedate").value = targetDate;
     taskModal.classList.add("active");
   }
+
+  window.openContactFormModal = openContactFormModal;
+  window.openDealFormModal = openDealFormModal;
+  window.openTaskFormModal = openTaskFormModal;
+  window.refreshCRMSelects = () => {
+    populateContactSelects();
+    populateStageSelects();
+  };
 
   // Form Submissions Binds
   document.getElementById("contact-form").addEventListener('submit', async (e) => {
@@ -289,7 +355,7 @@ function setupModalEvents() {
       company: document.getElementById("c-company").value.trim(),
       email: document.getElementById("c-email").value.trim(),
       phone: document.getElementById("c-phone").value.trim(),
-      stage: document.getElementById("c-stage").value,
+      stage: "Lead",
       value: parseFloat(document.getElementById("c-value").value) || 0,
       status: "Active"
     };
@@ -310,6 +376,15 @@ function setupModalEvents() {
       stage: document.getElementById("d-stage").value
     };
 
+    if (!newDeal.contactId) {
+      showToast("warning", "Please select an associated contact.");
+      return;
+    }
+    if (!newDeal.stage) {
+      showToast("warning", "Please add at least one pipeline stage.");
+      return;
+    }
+
     await store.addDeal(newDeal);
     dealModal.classList.remove("active");
     navigateToView(currentView); // Refresh
@@ -324,6 +399,11 @@ function setupModalEvents() {
       priority: document.getElementById("t-priority").value,
       contactId: document.getElementById("t-contact").value
     };
+
+    if (!newTask.contactId) {
+      showToast("warning", "Please select an associated contact.");
+      return;
+    }
 
     await store.addTask(newTask);
     taskModal.classList.remove("active");
@@ -363,7 +443,9 @@ function populateStageSelects() {
   const stages = store.getPipelineStages();
   const dealStageSelect = document.getElementById("d-stage");
   if (dealStageSelect) {
-    dealStageSelect.innerHTML = stages.map(s => `<option value="${s.key}">${s.label}</option>`).join('');
+    dealStageSelect.innerHTML = stages.length > 0
+      ? stages.map(s => `<option value="${s.key}">${s.label}</option>`).join('')
+      : '<option value="" disabled selected>No pipeline stages available</option>';
   }
 }
 
@@ -400,26 +482,85 @@ function setupThemeManager() {
   // Apply stored theme on start
   const activeTheme = store.getTheme();
   document.documentElement.setAttribute("data-theme", activeTheme);
-
-  // Clear previous theme click listeners to avoid double binding
-  const newThemeToggle = themeToggle.cloneNode(true);
-  themeToggle.parentNode.replaceChild(newThemeToggle, themeToggle);
-
-  newThemeToggle.addEventListener('click', () => {
-    const currentTheme = store.getTheme();
-    const nextTheme = currentTheme === "dark" ? "light" : "dark";
-    
-    store.setTheme(nextTheme);
-    showToast("success", `Theme changed to ${nextTheme} mode.`);
-  });
 }
+
+window.setCRMTheme = async (theme) => {
+  await store.setTheme(theme);
+  showToast("success", `Theme changed to ${theme} mode.`);
+  window.dispatchEvent(new CustomEvent("crm-theme-changed", { detail: { theme } }));
+};
+
+let deferredInstallPrompt = null;
+let desktopAppInstalled = false;
+
+function isDesktopAppInstalled() {
+  return desktopAppInstalled
+    || window.matchMedia("(display-mode: standalone)").matches
+    || window.navigator.standalone === true;
+}
+
+function getPwaInstallState() {
+  return {
+    canInstall: Boolean(deferredInstallPrompt),
+    isInstalled: isDesktopAppInstalled()
+  };
+}
+
+async function installDesktopApp() {
+  if (isDesktopAppInstalled()) {
+    showToast("success", "Abilix CRM is already installed.");
+    return { outcome: "installed" };
+  }
+
+  if (!deferredInstallPrompt) {
+    showToast("warning", "Install prompt is not ready yet. Use Chrome or Edge on HTTPS or localhost.");
+    return { outcome: "unavailable" };
+  }
+
+  deferredInstallPrompt.prompt();
+  const choice = await deferredInstallPrompt.userChoice;
+  deferredInstallPrompt = null;
+  window.dispatchEvent(new CustomEvent("crm-pwa-install-state-changed"));
+
+  if (choice.outcome === "accepted") {
+    showToast("success", "Desktop app installation started.");
+  } else {
+    showToast("warning", "Desktop app installation cancelled.");
+  }
+
+  return choice;
+}
+
+function setupPwaSupport() {
+  window.addEventListener("beforeinstallprompt", (event) => {
+    event.preventDefault();
+    deferredInstallPrompt = event;
+    window.dispatchEvent(new CustomEvent("crm-pwa-install-state-changed"));
+  });
+
+  window.addEventListener("appinstalled", () => {
+    desktopAppInstalled = true;
+    deferredInstallPrompt = null;
+    showToast("success", "Abilix CRM desktop app installed.");
+    window.dispatchEvent(new CustomEvent("crm-pwa-install-state-changed"));
+  });
+
+  if ("serviceWorker" in navigator && ["http:", "https:"].includes(window.location.protocol)) {
+    navigator.serviceWorker.register("/sw.js").catch((error) => {
+      console.warn("abilix-pwa: service worker registration failed", error);
+    });
+  }
+}
+
+window.crmGetInstallState = getPwaInstallState;
+window.crmInstallDesktopApp = installDesktopApp;
 
 // --- Pipeline Stages Customizer ---
 function openPipelineCustomizer() {
   const modal = document.getElementById("pipeline-stages-modal");
   if (!modal) return;
 
-  let tempStages = store.getPipelineStages().map(s => ({ ...s }));
+  let tempStages = store.getPipelineStages().map(s => ({ ...s, color: normalizeStageColor(s.color) }));
 
   const listContainer = document.getElementById("stages-manager-list");
   const newLabelInput = document.getElementById("new-stage-label");
@@ -427,24 +568,24 @@ function openPipelineCustomizer() {
   const btnAddStage = document.getElementById("btn-add-stage-item");
   const btnSave = document.getElementById("btn-save-pipeline-stages");
 
+  newColorSelect.innerHTML = renderStageColorOptions(newColorSelect.value || "#3b82f6");
+  newColorSelect.closest(".stage-color-control")?.style.setProperty("--stage-color", normalizeStageColor(newColorSelect.value));
+  newColorSelect.addEventListener("change", () => {
+    newColorSelect.closest(".stage-color-control")?.style.setProperty("--stage-color", normalizeStageColor(newColorSelect.value));
+  });
+
   function renderTempStages() {
     listContainer.innerHTML = tempStages.map((st, index) => {
+      const color = normalizeStageColor(st.color);
       return `
-        <div class="stage-manager-item" data-index="${index}" style="display:flex;align-items:center;gap:10px;background:rgba(var(--bg-card-rgb), 0.4);border:1px solid var(--border-color);border-radius:var(--radius-sm);padding:8px 12px;transition:var(--transition-fast);width:100%;">
+        <div class="stage-manager-item" data-index="${index}" style="--stage-color:${color};display:flex;align-items:center;gap:10px;background:rgba(var(--bg-card-rgb), 0.4);border:1px solid color-mix(in srgb, var(--stage-color) 35%, var(--border-color));border-radius:var(--radius-sm);padding:8px 12px;transition:var(--transition-fast);width:100%;box-shadow:0 0 18px color-mix(in srgb, var(--stage-color) 18%, transparent);">
           <div style="flex:1;">
             <input type="text" class="form-control stage-label-input" value="${st.label}" data-index="${index}" style="margin-bottom:0;padding:6px 10px;font-size:13px;height:34px;background:var(--bg-input);border:1px solid var(--border-color);color:var(--text-primary);border-radius:var(--radius-sm);width:100%;">
           </div>
-          <div style="width:110px;flex-shrink:0;">
+          <div class="stage-color-control" style="width:140px;flex-shrink:0;position:relative;--stage-color:${color};">
+            <span class="stage-color-dot" aria-hidden="true"></span>
             <select class="form-control stage-color-select" data-index="${index}" style="margin-bottom:0;padding:0 8px;font-size:13px;height:34px;background:var(--bg-input);border:1px solid var(--border-color);color:var(--text-primary);border-radius:var(--radius-sm);width:100%;">
-              <option value="var(--accent-indigo)" ${st.color === 'var(--accent-indigo)' ? 'selected' : ''}>Indigo</option>
-              <option value="#818cf8" ${st.color === '#818cf8' ? 'selected' : ''}>L-Indigo</option>
-              <option value="#60a5fa" ${st.color === '#60a5fa' ? 'selected' : ''}>Blue</option>
-              <option value="#2dd4bf" ${st.color === '#2dd4bf' ? 'selected' : ''}>Teal</option>
-              <option value="var(--accent-emerald)" ${st.color === 'var(--accent-emerald)' ? 'selected' : ''}>Emerald</option>
-              <option value="var(--accent-amber)" ${st.color === 'var(--accent-amber)' ? 'selected' : ''}>Amber</option>
-              <option value="var(--accent-crimson)" ${st.color === 'var(--accent-crimson)' ? 'selected' : ''}>Crimson</option>
-              <option value="#c084fc" ${st.color === '#c084fc' ? 'selected' : ''}>Purple</option>
-              <option value="#f472b6" ${st.color === '#f472b6' ? 'selected' : ''}>Pink</option>
+              ${renderStageColorOptions(color)}
             </select>
           </div>
           <div style="display:flex;gap:4px;flex-shrink:0;">
@@ -462,14 +603,17 @@ function openPipelineCustomizer() {
     listContainer.querySelectorAll(".stage-label-input").forEach(input => {
       input.addEventListener("input", (e) => {
         const idx = parseInt(input.getAttribute("data-index"));
-        tempStages[idx].label = e.target.value.trim();
+        tempStages[idx].label = e.target.value;
       });
     });
 
     listContainer.querySelectorAll(".stage-color-select").forEach(select => {
       select.addEventListener("change", (e) => {
         const idx = parseInt(select.getAttribute("data-index"));
-        tempStages[idx].color = e.target.value;
+        const color = normalizeStageColor(e.target.value);
+        tempStages[idx].color = color;
+        select.closest(".stage-color-control")?.style.setProperty("--stage-color", color);
+        select.closest(".stage-manager-item")?.style.setProperty("--stage-color", color);
       });
     });
 
@@ -540,7 +684,7 @@ function openPipelineCustomizer() {
       keyVal += "-" + Date.now().toString().slice(-4);
     }
 
-    const colorVal = newColorSelect.value;
+    const colorVal = normalizeStageColor(newColorSelect.value);
     tempStages.push({ key: keyVal, label: labelVal, color: colorVal });
     
     newLabelInput.value = "";
@@ -560,13 +704,20 @@ function openPipelineCustomizer() {
     
     // Check if any stage has empty label
     for (let i = 0; i < tempStages.length; i++) {
-      if (!tempStages[i].label) {
+      if (!tempStages[i].label.trim()) {
         showToast("warning", "Stage labels cannot be empty.");
         return;
       }
     }
 
-    await store.savePipelineStages(tempStages);
+    const stagesToSave = tempStages.map((stage, index) => ({
+      ...stage,
+      label: stage.label.trim(),
+      color: normalizeStageColor(stage.color),
+      position: index
+    }));
+
+    await store.savePipelineStages(stagesToSave);
     modal.classList.remove("active");
     navigateToView(currentView); // Refresh current pipeline page
     showToast("success", "Pipeline stages customized successfully.");
@@ -627,6 +778,18 @@ function setupGlobalEvents() {
   // Listen for request to open Pipeline Customizer modal
   window.addEventListener('crm-open-pipeline-customizer', () => {
     openPipelineCustomizer();
+  });
+
+  window.addEventListener('crm-open-deal-modal', (e) => {
+    window.openDealFormModal?.(e.detail?.contactId || "");
+  });
+
+  window.addEventListener('crm-open-task-modal', (e) => {
+    window.openTaskFormModal?.(e.detail?.contactId || "");
+  });
+
+  window.addEventListener('crm-open-contact-modal', () => {
+    window.openContactFormModal?.();
   });
 
   // Listen for request to open Contact slide drawer from anywhere
@@ -730,6 +893,7 @@ function setupAuthEvents() {
 
 // --- App Bootstrap ---
 document.addEventListener("DOMContentLoaded", async () => {
+  setupPwaSupport();
   setupModalEvents();
   setupDrawerEvents();
   setupGlobalEvents();

@@ -24,8 +24,9 @@ window.renderPipeline = function(container, store) {
     <!-- Scrollable Columns Grid -->
     <div class="pipeline-container" id="pipeline-scroll-container">
       ${STAGES.map(st => {
+        const stageColor = window.normalizeStageColor ? window.normalizeStageColor(st.color) : (st.color || "var(--accent-indigo)");
         return `
-          <div class="pipeline-column" data-stage="${st.key}">
+          <div class="pipeline-column" data-stage="${st.key}" style="--stage-color:${stageColor};">
             <div class="column-header">
               <div class="column-title">
                 <h4>${st.label}</h4>
@@ -176,7 +177,11 @@ window.renderPipeline = function(container, store) {
 
   // Create Deal action opens deal form modal
   document.getElementById("btn-add-deal").addEventListener('click', () => {
-    document.getElementById("deal-modal").classList.add("active");
+    if (window.openDealFormModal) {
+      window.openDealFormModal();
+      return;
+    }
+    window.dispatchEvent(new CustomEvent('crm-open-deal-modal'));
   });
 
   document.getElementById("btn-customize-pipeline").addEventListener('click', () => {

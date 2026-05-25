@@ -457,12 +457,16 @@ window.CRMStore = class CRMStore {
   }
 
   async savePipelineStages(stages) {
-    this.cache.stages = stages;
+    this.cache.stages = stages.map((stage, index) => ({
+      ...stage,
+      color: window.normalizeStageColor ? window.normalizeStageColor(stage.color) : stage.color,
+      position: index
+    }));
 
     // Local Cache Migration
-    const firstStageKey = stages[0]?.key || "appointment-scheduled";
+    const firstStageKey = this.cache.stages[0]?.key || "appointment-scheduled";
     this.cache.deals.forEach(deal => {
-      const stageExists = stages.some(st => st.key === deal.stage);
+      const stageExists = this.cache.stages.some(st => st.key === deal.stage);
       if (!stageExists) {
         deal.stage = firstStageKey;
       }
@@ -475,7 +479,7 @@ window.CRMStore = class CRMStore {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${this.getSessionToken()}`
         },
-        body: JSON.stringify({ stages })
+        body: JSON.stringify({ stages: this.cache.stages })
       });
     } catch (e) {
       console.error("abilix-store: Sync stages save failed", e);

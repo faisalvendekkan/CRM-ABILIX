@@ -171,6 +171,10 @@ window.renderTasks = function(container, store) {
 
   // Create Task button triggers modal
   document.getElementById("btn-add-task").addEventListener('click', () => {
-    document.getElementById("task-modal").classList.add("active");
+    if (window.openTaskFormModal) {
+      window.openTaskFormModal();
+      return;
+    }
+    window.dispatchEvent(new CustomEvent('crm-open-task-modal'));
   });
 }

@@ -30,13 +30,13 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // --- Seeding default data ---
 const DEFAULT_STAGES = [
-  { key: "appointment-scheduled", label: "Appointment Scheduled", color: "var(--accent-indigo)", position: 0 },
-  { key: "qualified-to-buy", label: "Qualified to Buy", color: "#818cf8", position: 1 },
-  { key: "presentation-scheduled", label: "Presentation Scheduled", color: "#a5b4fc", position: 2 },
-  { key: "decision-maker-bought-in", label: "Decision Bought-In", color: "#6366f1", position: 3 },
-  { key: "contract-sent", label: "Contract Sent", color: "var(--accent-amber)", position: 4 },
-  { key: "closed-won", label: "Closed Won", color: "var(--accent-emerald)", position: 5 },
-  { key: "closed-lost", label: "Closed Lost", color: "var(--accent-crimson)", position: 6 }
+  { key: "appointment-scheduled", label: "Appointment Scheduled", color: "#3b82f6", position: 0 },
+  { key: "qualified-to-buy", label: "Qualified to Buy", color: "#14b8a6", position: 1 },
+  { key: "presentation-scheduled", label: "Presentation Scheduled", color: "#8b5cf6", position: 2 },
+  { key: "decision-maker-bought-in", label: "Decision Bought-In", color: "#f59e0b", position: 3 },
+  { key: "contract-sent", label: "Contract Sent", color: "#f97316", position: 4 },
+  { key: "closed-won", label: "Closed Won", color: "#22c55e", position: 5 },
+  { key: "closed-lost", label: "Closed Lost", color: "#ef4444", position: 6 }
 ];
 
 async function seedDefaultUsers() {

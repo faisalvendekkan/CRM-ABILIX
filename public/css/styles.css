@@ -693,6 +693,13 @@ body {
   flex-wrap: wrap;
 }
 
+.toolbar-button-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 .select-filter {
   height: 38px;
   background: var(--bg-card);
@@ -826,12 +833,24 @@ body {
   flex-direction: column;
   max-height: calc(100vh - 220px);
   transition: var(--transition-smooth);
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 0 22px color-mix(in srgb, var(--stage-color, var(--accent-indigo)) 13%, transparent);
+}
+
+.pipeline-column::before {
+  content: '';
+  height: 3px;
+  width: 100%;
+  background: var(--stage-color, var(--accent-indigo));
+  box-shadow: 0 0 18px var(--stage-color, var(--accent-indigo));
+  flex-shrink: 0;
 }
 
 .pipeline-column.drag-over {
-  border-color: var(--accent-indigo);
-  background: rgba(var(--indigo-hsl), 0.05);
-  box-shadow: 0 0 15px rgba(99, 102, 241, 0.2);
+  border-color: var(--stage-color, var(--accent-indigo));
+  background: color-mix(in srgb, var(--stage-color, var(--accent-indigo)) 8%, var(--bg-card));
+  box-shadow: 0 0 24px color-mix(in srgb, var(--stage-color, var(--accent-indigo)) 28%, transparent);
 }
 
 .column-header {
@@ -857,8 +876,9 @@ body {
 
 .column-count {
   font-size: 12px;
-  background: var(--border-color);
-  color: var(--text-secondary);
+  background: color-mix(in srgb, var(--stage-color, var(--accent-indigo)) 18%, transparent);
+  color: var(--text-primary);
+  border: 1px solid color-mix(in srgb, var(--stage-color, var(--accent-indigo)) 35%, transparent);
   padding: 2px 8px;
   border-radius: 10px;
   font-weight: 600;
@@ -894,8 +914,8 @@ body {
 
 .deal-card:hover {
   transform: translateY(-2px);
-  border-color: rgba(var(--border-rgb), 0.25);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
+  border-color: color-mix(in srgb, var(--stage-color, var(--accent-indigo)) 35%, rgba(var(--border-rgb), 0.25));
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15), 0 0 16px color-mix(in srgb, var(--stage-color, var(--accent-indigo)) 13%, transparent);
 }
 
 .deal-card:active {
@@ -933,7 +953,27 @@ body {
 .deal-card-value {
   font-size: 14px;
   font-weight: 700;
-  color: var(--accent-indigo);
+  color: var(--stage-color, var(--accent-indigo));
+}
+
+.stage-color-control .stage-color-dot {
+  position: absolute;
+  left: 11px;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--stage-color, var(--accent-indigo));
+  box-shadow: 0 0 12px var(--stage-color, var(--accent-indigo));
+  transform: translateY(-50%);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.stage-color-control select {
+  padding-left: 32px !important;
+  border-color: color-mix(in srgb, var(--stage-color, var(--accent-indigo)) 38%, var(--border-color)) !important;
+  box-shadow: 0 0 14px color-mix(in srgb, var(--stage-color, var(--accent-indigo)) 15%, transparent);
 }
 
 .deal-card-date {
@@ -1657,6 +1697,105 @@ textarea.form-control {
   color: var(--text-primary);
 }
 
+/* --- Settings View --- */
+.settings-layout {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(260px, 1fr));
+  gap: 24px;
+  max-width: 900px;
+}
+
+.settings-section {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.settings-section-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.settings-section-header h2 {
+  font-family: var(--font-title);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.settings-section-header span {
+  display: block;
+  margin-top: 3px;
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+.settings-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.settings-icon i {
+  width: 20px;
+  height: 20px;
+}
+
+.theme-choice-group {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.theme-choice {
+  height: 74px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-input);
+  color: var(--text-secondary);
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.theme-choice:hover {
+  color: var(--text-primary);
+  border-color: rgba(var(--border-rgb), 0.22);
+  background: var(--bg-input-focus);
+}
+
+.theme-choice.active {
+  color: var(--accent-indigo);
+  border-color: var(--accent-indigo);
+  background: rgba(var(--indigo-hsl), 0.1);
+  box-shadow: 0 0 18px rgba(99, 102, 241, 0.18);
+}
+
+.theme-choice i {
+  width: 18px;
+  height: 18px;
+}
+
+.settings-install-btn {
+  align-self: flex-start;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
 /* --- Responsive Adaptations --- */
 @media (max-width: 1200px) {
   .stats-grid {
@@ -1668,6 +1807,9 @@ textarea.form-control {
 }
 
 @media (max-width: 900px) {
+  .settings-layout {
+    grid-template-columns: 1fr;
+  }
   .sidebar {
     position: fixed;
     left: -260px;

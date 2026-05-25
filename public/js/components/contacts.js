@@ -32,9 +32,17 @@ window.renderContacts = function(container, store) {
         </select>
       </div>
 
-      <button class="btn btn-primary" id="btn-add-contact">
-        <i data-lucide="plus"></i> Add Contact
-      </button>
+      <div class="toolbar-button-group">
+        <button class="btn btn-outline" id="btn-export-contacts-excel">
+          <i data-lucide="file-spreadsheet"></i> Export Excel
+        </button>
+        <button class="btn btn-outline" id="btn-download-contacts-pdf">
+          <i data-lucide="file-down"></i> Download PDF
+        </button>
+        <button class="btn btn-primary" id="btn-add-contact">
+          <i data-lucide="plus"></i> Add Contact
+        </button>
+      </div>
     </div>
 
     <!-- Table Content wrapper -->
@@ -66,17 +74,221 @@ window.renderContacts = function(container, store) {
   const stageSelect = document.getElementById("filter-stage");
   const statusSelect = document.getElementById("filter-status");
 
-  function updateTable() {
+  function getFilteredContacts() {
     const query = searchInput.value.toLowerCase();
     const stageVal = stageSelect.value;
     const statusVal = statusSelect.value;
 
-    const contacts = store.getContacts().filter(c => {
-      const matchQuery = c.name.toLowerCase().includes(query) || c.company.toLowerCase().includes(query) || c.email.toLowerCase().includes(query);
+    return store.getContacts().filter(c => {
+      const searchable = [c.name, c.company, c.email].map(value => String(value || "").toLowerCase()).join(" ");
+      const matchQuery = searchable.includes(query);
       const matchStage = stageVal === "ALL" || c.stage === stageVal;
       const matchStatus = statusVal === "ALL" || c.status === statusVal;
       return matchQuery && matchStage && matchStatus;
     });
+  }
+
+  function getExportRows() {
+    return getFilteredContacts().map(c => ({
+      name: c.name || "",
+      company: c.company || "",
+      email: c.email || "",
+      phone: c.phone || "",
+      stage: c.stage || "Lead",
+      status: c.status || "",
+      value: Number(c.value || 0),
+      created: c.createdAt ? new Date(c.createdAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : ""
+    }));
+  }
+
+  function escapeCell(value) {
+    return String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function downloadBlob(filename, mimeType, content) {
+    const blob = new Blob([content], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  function exportContactsExcel() {
+    const rows = getExportRows();
+    if (rows.length === 0) {
+      window.dispatchEvent(new CustomEvent('crm-alert', {
+        detail: { type: 'warning', message: 'No contacts available to export.' }
+      }));
+      return;
+    }
+
+    const filename = `abilix-leads-contacts-${new Date().toISOString().slice(0, 10)}.xls`;
+    const headers = ["Name", "Company", "Email", "Phone", "Lifecycle Stage", "Status", "Estimated Value", "Created"];
+    const bodyRows = rows.map(row => [
+      row.name,
+      row.company,
+      row.email,
+      row.phone,
+      row.stage,
+      row.status,
+      row.value,
+      row.created
+    ]);
+
+    const htmlTable = `
+      <html>
+        <head><meta charset="UTF-8"></head>
+        <body>
+          <table>
+            <thead><tr>${headers.map(header => `<th>${escapeCell(header)}</th>`).join("")}</tr></thead>
+            <tbody>
+              ${bodyRows.map(row => `<tr>${row.map(cell => `<td style="mso-number-format:'\\@';">${escapeCell(cell)}</td>`).join("")}</tr>`).join("")}
+            </tbody>
+          </table>
+        </body>
+      </html>
+    `;
+
+    downloadBlob(filename, "application/vnd.ms-excel;charset=utf-8", htmlTable);
+    window.dispatchEvent(new CustomEvent('crm-alert', {
+      detail: { type: 'success', message: `Exported ${rows.length} leads and contacts to Excel.` }
+    }));
+  }
+
+  function downloadContactsPdf() {
+    const rows = getExportRows();
+    if (rows.length === 0) {
+      window.dispatchEvent(new CustomEvent('crm-alert', {
+        detail: { type: 'warning', message: 'No contacts available for PDF download.' }
+      }));
+      return;
+    }
+
+    const pdfApi = window.jspdf && window.jspdf.jsPDF;
+    if (!pdfApi) {
+      const printWindow = window.open("", "_blank");
+      if (!printWindow) return;
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>Abilix Leads & Contacts</title>
+            <style>
+              body { font-family: Arial, sans-serif; padding: 24px; color: #111827; }
+              table { width: 100%; border-collapse: collapse; font-size: 11px; }
+              th, td { border: 1px solid #d1d5db; padding: 7px; text-align: left; }
+              th { background: #f3f4f6; }
+            </style>
+          </head>
+          <body>
+            <h2>Abilix Leads & Contacts</h2>
+            <table>
+              <thead><tr><th>Name</th><th>Company</th><th>Email</th><th>Phone</th><th>Stage</th><th>Status</th><th>Value</th><th>Created</th></tr></thead>
+              <tbody>${rows.map(row => `<tr><td>${escapeCell(row.name)}</td><td>${escapeCell(row.company)}</td><td>${escapeCell(row.email)}</td><td>${escapeCell(row.phone)}</td><td>${escapeCell(row.stage)}</td><td>${escapeCell(row.status)}</td><td>${escapeCell(window.CURRENCY_SYMBOL || "\u20b9")}${row.value.toLocaleString()}</td><td>${escapeCell(row.created)}</td></tr>`).join("")}</tbody>
+            </table>
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+      printWindow.focus();
+      printWindow.print();
+      return;
+    }
+
+    const doc = new pdfApi({ orientation: "landscape", unit: "pt", format: "a4" });
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 32;
+    const columns = [
+      { label: "Name", width: 90 },
+      { label: "Company", width: 90 },
+      { label: "Email", width: 130 },
+      { label: "Phone", width: 90 },
+      { label: "Stage", width: 100 },
+      { label: "Status", width: 70 },
+      { label: "Value", width: 75 },
+      { label: "Created", width: 85 }
+    ];
+    const rowHeight = 22;
+    let y = 74;
+
+    function drawTitle() {
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(16);
+      doc.text("Abilix Leads & Contacts", margin, 38);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.text(`Generated ${new Date().toLocaleDateString()} - ${rows.length} records`, margin, 54);
+    }
+
+    function drawHeader() {
+      let x = margin;
+      doc.setFillColor(243, 244, 246);
+      doc.rect(margin, y, pageWidth - margin * 2, rowHeight, "F");
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(8);
+      columns.forEach(col => {
+        doc.text(col.label, x + 4, y + 14, { maxWidth: col.width - 8 });
+        x += col.width;
+      });
+      y += rowHeight;
+    }
+
+    function drawCellText(text, x, yPosition, width) {
+      const value = String(text ?? "");
+      doc.text(value.length > 38 ? `${value.slice(0, 35)}...` : value, x + 4, yPosition + 14, { maxWidth: width - 8 });
+    }
+
+    drawTitle();
+    drawHeader();
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+
+    rows.forEach(row => {
+      if (y + rowHeight > pageHeight - margin) {
+        doc.addPage();
+        y = 42;
+        drawHeader();
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(8);
+      }
+
+      let x = margin;
+      const values = [
+        row.name,
+        row.company,
+        row.email,
+        row.phone,
+        row.stage,
+        row.status,
+        `${window.CURRENCY_SYMBOL || "\u20b9"}${row.value.toLocaleString()}`,
+        row.created
+      ];
+
+      doc.setDrawColor(229, 231, 235);
+      doc.rect(margin, y, pageWidth - margin * 2, rowHeight);
+      values.forEach((value, index) => {
+        drawCellText(value, x, y, columns[index].width);
+        x += columns[index].width;
+      });
+      y += rowHeight;
+    });
+
+    doc.save(`abilix-leads-contacts-${new Date().toISOString().slice(0, 10)}.pdf`);
+    window.dispatchEvent(new CustomEvent('crm-alert', {
+      detail: { type: 'success', message: `Downloaded PDF for ${rows.length} leads and contacts.` }
+    }));
+  }
+
+  function updateTable() {
+    const contacts = getFilteredContacts();
 
     if (contacts.length === 0) {
       tableBody.innerHTML = `
@@ -141,13 +353,19 @@ window.renderContacts = function(container, store) {
   searchInput.addEventListener('input', updateTable);
   stageSelect.addEventListener('change', updateTable);
   statusSelect.addEventListener('change', updateTable);
+  document.getElementById("btn-export-contacts-excel").addEventListener('click', exportContactsExcel);
+  document.getElementById("btn-download-contacts-pdf").addEventListener('click', downloadContactsPdf);
 
   // Trigger initial draw
   updateTable();
 
   // Add Contact modal open
   document.getElementById("btn-add-contact").addEventListener('click', () => {
-    document.getElementById("contact-modal").classList.add("active");
+    if (window.openContactFormModal) {
+      window.openContactFormModal();
+      return;
+    }
+    window.dispatchEvent(new CustomEvent('crm-open-contact-modal'));
   });
 }
 
@@ -342,11 +560,11 @@ window.openContactDrawer = function(contactId, store, refreshCallback) {
   const addDealBtnClone = addDealBtn.cloneNode(true);
   addDealBtn.parentNode.replaceChild(addDealBtnClone, addDealBtn);
   addDealBtnClone.addEventListener('click', () => {
-    // Fill contact value automatically on deal modal and show
-    const dealModal = document.getElementById("deal-modal");
-    const contactSelect = document.getElementById("d-contact");
-    contactSelect.value = contactId;
-    dealModal.classList.add("active");
+    if (window.openDealFormModal) {
+      window.openDealFormModal(contactId);
+    } else {
+      window.dispatchEvent(new CustomEvent('crm-open-deal-modal', { detail: { contactId } }));
+    }
     
     // Close Drawer first
     drawer.classList.remove("active");
@@ -357,10 +575,11 @@ window.openContactDrawer = function(contactId, store, refreshCallback) {
   const addTaskBtnClone = addTaskBtn.cloneNode(true);
   addTaskBtn.parentNode.replaceChild(addTaskBtnClone, addTaskBtn);
   addTaskBtnClone.addEventListener('click', () => {
-    const taskModal = document.getElementById("task-modal");
-    const contactSelect = document.getElementById("t-contact");
-    contactSelect.value = contactId;
-    taskModal.classList.add("active");
+    if (window.openTaskFormModal) {
+      window.openTaskFormModal(contactId);
+    } else {
+      window.dispatchEvent(new CustomEvent('crm-open-task-modal', { detail: { contactId } }));
+    }
     
     // Close Drawer first
     drawer.classList.remove("active");

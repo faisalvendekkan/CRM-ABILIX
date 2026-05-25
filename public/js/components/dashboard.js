@@ -209,7 +209,8 @@ window.renderDashboard = function(container, store, navigateToView) {
 
     const donutSlices = stagesList.map(st => {
       const count = deals.filter(d => d.stage === st.key).length;
-      return { label: st.label, count, color: st.color || "var(--accent-indigo)" };
+      const color = window.normalizeStageColor ? window.normalizeStageColor(st.color) : (st.color || "var(--accent-indigo)");
+      return { label: st.label, count, color };
     });
 
     drawDealDonutChart(donutContainer, donutSlices);
