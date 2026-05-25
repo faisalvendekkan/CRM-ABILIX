@@ -18,7 +18,7 @@ window.renderUsers = function(container, store, users = []) {
     </div>
 
     <div class="table-wrapper">
-      <table class="contacts-table">
+      <table class="contacts-table users-table">
         <thead>
           <tr>
             <th>Full Name</th>

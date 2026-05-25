@@ -11,7 +11,7 @@ window.renderPipeline = function(container, store) {
       <div class="toolbar-filters">
         <h2 style="font-family:var(--font-title);font-size:18px;font-weight:600;">Sales Pipeline</h2>
       </div>
-      <div style="display:flex;gap:10px;">
+      <div class="pipeline-toolbar-actions" style="display:flex;gap:10px;">
         <button class="btn btn-outline" id="btn-customize-pipeline">
           <i data-lucide="settings"></i> Customize Pipeline
         </button>

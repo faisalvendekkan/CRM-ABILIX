@@ -47,7 +47,7 @@ window.renderContacts = function(container, store) {
 
     <!-- Table Content wrapper -->
     <div class="table-wrapper">
-      <table class="contacts-table">
+      <table class="contacts-table contacts-list-table">
         <thead>
           <tr>
             <th>Name</th>

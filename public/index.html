@@ -47,7 +47,7 @@
         <!-- Canvas CAPTCHA verification (Faisal request) -->
         <div class="form-group" style="margin-bottom:0;display:flex;flex-direction:column;gap:6px;">
           <label style="font-size:12px;font-weight:600;color:var(--text-secondary);">Human Verification *</label>
-          <div style="display:flex;gap:10px;align-items:center;">
+          <div class="login-captcha-row" style="display:flex;gap:10px;align-items:center;">
             <canvas id="captcha-canvas" width="130" height="42" style="background:rgba(var(--bg-card-rgb), 0.5);border:1px solid var(--border-color);border-radius:var(--radius-sm);cursor:pointer;backdrop-filter:blur(4px);" title="Click to refresh CAPTCHA"></canvas>
             <button type="button" id="btn-refresh-captcha" class="btn btn-outline" style="height:42px;width:42px;padding:0;display:flex;align-items:center;justify-content:center;" title="Refresh CAPTCHA">
               <i data-lucide="refresh-cw" style="width:16px;height:16px;"></i>
@@ -499,7 +499,7 @@
           <h3 style="font-size:14px;font-weight:600;margin-bottom:12px;color:var(--text-primary);display:flex;align-items:center;gap:8px;">
             <i data-lucide="plus-circle" style="width:16px;height:16px;color:var(--accent-indigo);"></i> Add Custom Pipeline Stage
           </h3>
-          <div style="display:flex;gap:10px;">
+          <div class="stage-add-row" style="display:flex;gap:10px;">
             <div style="flex:1;">
               <input type="text" id="new-stage-label" class="form-control" placeholder="e.g. Qualified Lead" style="margin-bottom:0;height:40px;">
             </div>
